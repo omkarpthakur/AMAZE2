@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pathfinding Visualization</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        #canvas {
+            border: 1px solid #000;
+            background-color: white;
+        }
+        #info {
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas" width="800" height="600"></canvas>
+    <div id="info"></div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const info = document.getElementById('info');
+
+        const points = {{ points|tojson }};
+        let path = [];
+        let current = null;
+        let start = null;
+        let goal = null;
+
+        function drawPoints() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw points
+            for (let [label, coord] of Object.entries(points)) {
+                ctx.beginPath();
+                ctx.arc(coord[0], coord[1], 5, 0, 2 * Math.PI);
+                ctx.fillStyle = 'blue';
+                ctx.fill();
+                ctx.fillStyle = 'black';
+                ctx.fillText(label, coord[0] + 10, coord[1] + 5);
+            }
+
+            // Draw path
+            if (path.length > 0) {
+                ctx.beginPath();
+                ctx.moveTo(path[0][0], path[0][1]);
+                for (let i = 1; i < path.length; i++) {
+                    ctx.lineTo(path[i][0], path[i][1]);
+                }
+                ctx.strokeStyle = 'green';
+                ctx.stroke();
+            }
+
+            // Draw current position
+            if (current) {
+                ctx.beginPath();
+                ctx.arc(current[0], current[1], 7, 0, 2 * Math.PI);
+                ctx.fillStyle = 'red';
+                ctx.fill();
+            }
+
+            // Draw start and goal
+            if (start) {
+                ctx.beginPath();
+                ctx.arc(start[0], start[1], 7, 0, 2 * Math.PI);
+                ctx.fillStyle = 'green';
+                ctx.fill();
+            }
+            if (goal) {
+                ctx.beginPath();
+                ctx.arc(goal[0], goal[1], 7, 0, 2 * Math.PI);
+                ctx.fillStyle = 'purple';
+                ctx.fill();
+            }
+        }
+
+        canvas.addEventListener('click', async (event) => {
+            const rect = canvas.getBoundingClientRect();
+            const clickX = event.clientX - rect.left;
+            const clickY = event.clientY - rect.top;
+
+            if (!start) {
+                start = [clickX, clickY];
+                info.textContent = "Start point set. Click to set goal point.";
+            } else if (!goal) {
+                goal = [clickX, clickY];
+                info.textContent = "Goal point set. Calculating initial path...";
+
+                const response = await fetch('/api/path', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({start: start, goal: goal}),
+                });
+                const data = await response.json();
+                if (data.path) {
+                    path = data.path;
+                    info.textContent = "Path calculated. Move your cursor to update the path.";
+                } else {
+                    info.textContent = "No path found. Try different points.";
+                }
+            } else {
+                start = null;
+                goal = null;
+                path = [];
+                info.textContent = "Points reset. Click to set new start point.";
+            }
+            drawPoints();
+        });
+
+        canvas.addEventListener('mousemove', async (event) => {
+            const rect = canvas.getBoundingClientRect();
+            current = [
+                event.clientX - rect.left,
+                event.clientY - rect.top
+            ];
+
+            if (path.length > 0) {
+                const response = await fetch('/api/dynamic_path', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({current: current, path: path}),
+                });
+                const data = await response.json();
+                if (data.next_point) {
+                    path = [current, data.next_point, ...path.slice(1)];
+                }
+            }
+
+            info.textContent = `Current: (${current[0].toFixed(2)}, ${current[1].toFixed(2)})`;
+            drawPoints();
+        });
+
+        drawPoints();
+    </script>
+</body>
+</html>
