@@ -3,32 +3,34 @@ import pickle
 import os
 from typing import Dict, List, Tuple, Optional
 
-Coordinate = Tuple[float, float, float]
+Coordinate = Tuple[float, float]
 Graph = Dict[Coordinate, Dict[Coordinate, float]]
 
-def weighted_graph(cordinate_dict):
-    coordinate_list = list(cordinate_dict.values())
+
+def weighted_graph(coordinate_dict):
+    coordinate_list = list(coordinate_dict.values())
 
     def create_weighted_graph(coord_list):
         weighted_graph = {}
 
         for coord_a in coord_list:
             weighted_graph[coord_a] = {}
-            x_a, y_a, z_a = coord_a
+            x_a, y_a = coord_a
 
             for coord_b in coord_list:
-                x_b, y_b, z_b = coord_b
+                x_b, y_b = coord_b
 
-                if x_a == x_b and y_a == y_b and z_a == z_b:
+                if x_a == x_b and y_a == y_b:
                     continue  # Skip the same coordinate
 
-                # Calculate 3D Euclidean distance
-                distance = ((x_b - x_a)**2 + (y_b - y_a)**2 + (z_b - z_a)**2)**0.5
+                # Calculate 2D Euclidean distance
+                distance = ((x_b - x_a) ** 2 + (y_b - y_a) ** 2) ** 0.5
                 weighted_graph[coord_a][coord_b] = distance
 
         return weighted_graph
 
     return create_weighted_graph(coordinate_list)
+
 
 def dynamic_path(path, current: Coordinate) -> Optional[List[Coordinate]]:
     if not path:
@@ -42,10 +44,11 @@ def dynamic_path(path, current: Coordinate) -> Optional[List[Coordinate]]:
         return [current, path[0]]
     return None
 
+
 def is_near(coord1: Coordinate, coord2: Coordinate) -> bool:
     return (abs(coord1[0] - coord2[0]) <= 1 and
-            abs(coord1[1] - coord2[1]) <= 1 and
-            abs(coord1[2] - coord2[2]) <= 1)
+            abs(coord1[1] - coord2[1]) <= 1)
+
 
 def astar(graph: Graph, start: Coordinate, goal: Coordinate) -> Optional[List[Coordinate]]:
     open_set = [(0, start)]
@@ -70,8 +73,10 @@ def astar(graph: Graph, start: Coordinate, goal: Coordinate) -> Optional[List[Co
 
     return None
 
+
 def heuristic(a: Coordinate, b: Coordinate) -> float:
-    return ((a[0] - b[0])**2 + (a[1] - b[1])**2 + (a[2] - b[2])**2)**0.5
+    return ((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2) ** 0.5
+
 
 def reconstruct_path(came_from: Dict[Coordinate, Coordinate], current: Coordinate) -> List[Coordinate]:
     path = [current]
@@ -79,6 +84,7 @@ def reconstruct_path(came_from: Dict[Coordinate, Coordinate], current: Coordinat
         current = came_from[current]
         path.append(current)
     return path[::-1]
+
 
 def load_dictionary(file_name: str) -> Optional[Dict]:
     try:
@@ -88,8 +94,10 @@ def load_dictionary(file_name: str) -> Optional[Dict]:
         print(f"File '{file_name}' not found.")
         return None
 
+
 def list_pkl_files() -> List[str]:
     return [f for f in os.listdir() if f.endswith('.pkl')]
+
 
 def select_file() -> Optional[str]:
     pkl_files = list_pkl_files()
@@ -110,17 +118,16 @@ def select_file() -> Optional[str]:
         except ValueError:
             print("Please enter a valid number.")
 
+
 def direction(current: Coordinate, path: List[Coordinate]) -> Dict[str, any]:
     if len(path) < 3:
         return {"error": "Path must contain at least three points after the current position"}
 
-    def displacement(a: Coordinate, b: Coordinate) -> Tuple[float, float, float]:
-        return (b[0] - a[0], b[1] - a[1], b[2] - a[2])
+    def displacement(a: Coordinate, b: Coordinate) -> Tuple[float, float]:
+        return (b[0] - a[0], b[1] - a[1])
 
-    def cross_product_3d(v1: Tuple[float, float, float], v2: Tuple[float, float, float]) -> Tuple[float, float, float]:
-        return (v1[1]*v2[2] - v1[2]*v2[1],
-                v1[2]*v2[0] - v1[0]*v2[2],
-                v1[0]*v2[1] - v1[1]*v2[0])
+    def cross_product_2d(v1: Tuple[float, float], v2: Tuple[float, float]) -> float:
+        return v1[0] * v2[1] - v1[1] * v2[0]
 
     next_point = path[0]
     point_after_next = path[1]
@@ -130,36 +137,27 @@ def direction(current: Coordinate, path: List[Coordinate]) -> Dict[str, any]:
     disp2 = displacement(next_point, point_after_next)
     disp3 = displacement(point_after_next, point_after_after_next)
 
-    # Calculate the 3D cross products
-    cross_product1 = cross_product_3d(disp1, disp2)
-    cross_product2 = cross_product_3d(disp2, disp3)
+    # Calculate the 2D cross products
+    cross_product1 = cross_product_2d(disp1, disp2)
+    cross_product2 = cross_product_2d(disp2, disp3)
 
     # Determine turn direction for the next turn
-    if cross_product2[2] > 0:
+    if cross_product2 > 0:
         next_turn_direction = "left"
-    elif cross_product2[2] < 0:
+    elif cross_product2 < 0:
         next_turn_direction = "right"
     else:
         next_turn_direction = "straight"
 
     # Calculate distance to the next point and the turn
-    distance_to_next = sum(x**2 for x in disp1)**0.5
-    distance_to_turn = distance_to_next + sum(x**2 for x in disp2)**0.5
+    distance_to_next = sum(x ** 2 for x in disp1) ** 0.5
+    distance_to_turn = distance_to_next + sum(x ** 2 for x in disp2) ** 0.5
 
     # Check for immediate direction change
-    if cross_product1[2] != 0:
-        immediate_turn = "left" if cross_product1[2] > 0 else "right"
+    if cross_product1 != 0:
+        immediate_turn = "left" if cross_product1 > 0 else "right"
     else:
         immediate_turn = None
-
-    # Check for stairs in the next segment
-    height_change_next = disp2[2]
-    if height_change_next > 0:
-        next_stairs = "ascending"
-    elif height_change_next < 0:
-        next_stairs = "descending"
-    else:
-        next_stairs = None
 
     # Prepare the warning message
     warning = ""
@@ -167,8 +165,6 @@ def direction(current: Coordinate, path: List[Coordinate]) -> Dict[str, any]:
         warning += f"Immediate {immediate_turn} turn. "
     if next_turn_direction != "straight":
         warning += f"Prepare to turn {next_turn_direction} after {distance_to_next:.2f} units. "
-    if next_stairs:
-        warning += f"Prepare for {next_stairs} stairs after {distance_to_next:.2f} units. "
 
     return {
         "warning": warning.strip(),
@@ -176,9 +172,8 @@ def direction(current: Coordinate, path: List[Coordinate]) -> Dict[str, any]:
         "next_turn_direction": next_turn_direction,
         "distance_to_next": distance_to_next,
         "distance_to_turn": distance_to_turn,
-        "next_stairs": next_stairs,
-        "height_change_next": height_change_next
     }
+
 
 def main():
     coordinate_file = select_file()
@@ -207,17 +202,24 @@ def main():
         print(f"Ending coordinate: {ending_coordinate}")
 
         checkpoints = astar(w_graph, starting_coordinate, ending_coordinate)
-        pathc = [(0, 0, 0), (10.0, 12.0, 0), (10.0, 17.0, 5), (13.0, 17.0, 5)]  # path of the characters
+        pathc = [(0, 0), (10.0, 12.0), (10.0, 17.0), (13.0, 17.0)]  # path of the characters
         i = 0
         while i < len(pathc):
             c = pathc[i]  # current location of user
-            path_update = dynamic_path(path=checkpoints, current=c)
+            path_update = dynamic_path(checkpoints, c)
             print(f"Current position: {c}")
             print(f"Path update: {path_update}")
-            if path_update and len(path_update) > 1:
-                dir_info = direction(c, path_update[1:] + [ending_coordinate])
+
+            # Ensure we have at least 3 points for direction calculation
+            if path_update and len(checkpoints) >= 3:
+                extended_path = [c] + checkpoints[:3]  # Include current position and next 3 points
+                dir_info = direction(c, extended_path)
                 print(f"Direction info: {dir_info}")
+            elif path_update:
+                print("Not enough points for detailed direction info.")
+
             i += 1
+
         if checkpoints:
             print("Shortest path:", checkpoints)
         else:
@@ -228,5 +230,6 @@ def main():
         if not ending_coordinate:
             print(f"Ending point '{goal_point}' not found in the dictionary.")
 
+
 if __name__ == "__main__":
-    main()
+    "main()"
